@@ -146,4 +146,13 @@ mod tests {
         let key = "test";
         assert_eq!(Some(&5), hm.get(key));
     }
+
+    #[test]
+    fn overwrite_does_not_increase_count() {
+        let mut hm = HashMap::new();
+        hm.set("a", 1);
+        hm.set("a", 2);
+        assert_eq!(hm.get_entries_count(), 1);
+        assert_eq!(hm.get("a"), Some(&2));
+    }
 }
