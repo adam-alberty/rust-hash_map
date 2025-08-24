@@ -1,6 +1,6 @@
 pub struct HashMap {
     buckets: Vec<Vec<(String, i32)>>,
-    entries_count: u32,
+    entries_count: usize,
 }
 
 // Tunables
@@ -22,28 +22,33 @@ impl HashMap {
     }
 
     // Get item by key
-    pub fn get(&self, key: &str) -> Option<i32> {
+    pub fn get(&self, key: &str) -> Option<&i32> {
         let bucket = &self.buckets[HashMap::hash(key, self.buckets.len()) as usize];
         for i in 0..bucket.len() {
             if bucket[i].0 == key {
-                return Some(bucket[i].1);
+                return Some(&bucket[i].1);
             }
         }
         None
     }
 
     pub fn set(&mut self, key: &str, value: i32) {
-        self.delete(key);
+        let bucket_index = HashMap::hash(key, self.buckets.len());
+        let bucket = &mut self.buckets[bucket_index];
 
-        let bucket_index = HashMap::hash(key, self.buckets.len()) as usize;
-        let v = &mut self.buckets[bucket_index];
-        v.push((key.to_string(), value));
+        for pair in bucket.iter_mut() {
+            if pair.0 == key {
+                pair.1 = value;
+                return;
+            }
+        }
+
+        bucket.push((key.to_string(), value));
         self.entries_count += 1;
-
         self.resize_if_necessary();
     }
 
-    pub fn delete(&mut self, key: &str) {
+    pub fn remove(&mut self, key: &str) {
         let bucket_index = HashMap::hash(key, self.buckets.len()) as usize;
         let v = &mut self.buckets[bucket_index];
         for i in 0..v.len() {
@@ -63,7 +68,7 @@ impl HashMap {
         }
     }
 
-    pub fn get_entries_count(&self) -> u32 {
+    pub fn get_entries_count(&self) -> usize {
         return self.entries_count;
     }
 
@@ -139,6 +144,6 @@ mod tests {
         let mut hm = HashMap::new();
         hm.set("test", 5);
         let key = "test";
-        assert_eq!(Some(5), hm.get(key));
+        assert_eq!(Some(&5), hm.get(key));
     }
 }
