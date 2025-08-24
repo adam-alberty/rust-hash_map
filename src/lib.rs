@@ -1,5 +1,5 @@
-pub struct HashMap {
-    buckets: Vec<Vec<(String, i32)>>,
+pub struct HashMap<V: Copy> {
+    buckets: Vec<Vec<(String, V)>>,
     entries_count: usize,
 }
 
@@ -9,7 +9,21 @@ const MAX_LOAD_FACTOR: f32 = 1.5;
 const MIN_LOAD_FACTOR: f32 = 0.25;
 const RESIZE_FACTOR: f32 = 1.4;
 
-impl HashMap {
+// uses the FNV-1a hash
+fn hash(key: &str, bucket_count: usize) -> usize {
+    const FNV_OFFSET_BASIS: u64 = 14695981039346656037;
+    const FNV_PRIME: u64 = 1099511628211;
+
+    let mut hash = FNV_OFFSET_BASIS;
+    for octet in key.as_bytes() {
+        hash ^= *octet as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+
+    (hash as usize) % bucket_count
+}
+
+impl<V: Copy> HashMap<V> {
     pub fn new() -> Self {
         let mut buckets = Vec::with_capacity(MIN_BUCKET_COUNT);
         for _ in 0..MIN_BUCKET_COUNT {
@@ -22,8 +36,8 @@ impl HashMap {
     }
 
     // Get item by key
-    pub fn get(&self, key: &str) -> Option<&i32> {
-        let bucket = &self.buckets[HashMap::hash(key, self.buckets.len()) as usize];
+    pub fn get(&self, key: &str) -> Option<&V> {
+        let bucket = &self.buckets[hash(key, self.buckets.len())];
         for i in 0..bucket.len() {
             if bucket[i].0 == key {
                 return Some(&bucket[i].1);
@@ -32,8 +46,8 @@ impl HashMap {
         None
     }
 
-    pub fn set(&mut self, key: &str, value: i32) {
-        let bucket_index = HashMap::hash(key, self.buckets.len());
+    pub fn set(&mut self, key: &str, value: V) {
+        let bucket_index = hash(key, self.buckets.len());
         let bucket = &mut self.buckets[bucket_index];
 
         for pair in bucket.iter_mut() {
@@ -49,19 +63,19 @@ impl HashMap {
     }
 
     pub fn remove(&mut self, key: &str) {
-        let bucket_index = HashMap::hash(key, self.buckets.len()) as usize;
-        let v = &mut self.buckets[bucket_index];
-        for i in 0..v.len() {
-            if v[i].0 == key {
-                v.remove(i);
+        let bucket_index = hash(key, self.buckets.len()) as usize;
+        let bucket = &mut self.buckets[bucket_index];
+        for i in 0..bucket.len() {
+            if bucket[i].0 == key {
+                bucket.remove(i);
                 self.entries_count -= 1;
+                self.resize_if_necessary();
                 return;
             }
         }
-        self.resize_if_necessary();
     }
 
-    pub fn get_bucket(&self, idx: usize) -> Result<&Vec<(String, i32)>, String> {
+    pub fn get_bucket(&self, idx: usize) -> Result<&Vec<(String, V)>, String> {
         match self.buckets.get(idx) {
             Some(bucket) => Ok(bucket),
             None => Err(String::from("bucket index out of bounds")),
@@ -74,20 +88,6 @@ impl HashMap {
 
     pub fn get_buckets_count(&self) -> usize {
         return self.buckets.len();
-    }
-
-    // uses the FNV-1a hash
-    fn hash(key: &str, bucket_count: usize) -> usize {
-        const FNV_OFFSET_BASIS: u64 = 14695981039346656037;
-        const FNV_PRIME: u64 = 1099511628211;
-
-        let mut hash = FNV_OFFSET_BASIS;
-        for octet in key.as_bytes() {
-            hash ^= *octet as u64;
-            hash = hash.wrapping_mul(FNV_PRIME);
-        }
-
-        (hash as usize) % bucket_count
     }
 
     fn resize_if_necessary(&mut self) {
@@ -111,8 +111,7 @@ impl HashMap {
 
         for bucket in &self.buckets {
             for item in bucket {
-                new_buckets[HashMap::hash(&item.0, new_bucket_count)]
-                    .push((item.0.clone(), item.1));
+                new_buckets[hash(&item.0, new_bucket_count)].push((item.0.clone(), item.1));
             }
         }
         self.buckets = new_buckets;
@@ -134,7 +133,7 @@ mod tests {
 
     #[test]
     fn item_not_found() {
-        let hm = HashMap::new();
+        let hm = HashMap::<i32>::new();
         let key = "test";
         assert_eq!(None, hm.get(key));
     }
